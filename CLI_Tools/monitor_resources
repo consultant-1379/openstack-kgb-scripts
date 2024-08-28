@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# Usage: monitor_resources <project name>
+if [ -z "$1" ]; then
+    echo "Please specify a project Name EG 'MyProject_C4A19'"
+    exit 1
+fi
+project_name=$1
+#Authenticate with deployment
+#Get rc
+./create_rc $project_name
+#Source rc
+source $project_name-openrc.sh
+#Clean up rc file
+rm $project_name-openrc.sh
+#Watch the resources
+while true; do sleep 5; nova absolute-limits; cinder quota-usage $OS_PROJECT_ID; done

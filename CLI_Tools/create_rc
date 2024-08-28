@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# Usage: create_rc <project name>
+#
+dit_username="METEOTOOL"
+dit_password="DppvaPYdnCTwGKBRRf3PaqFS"
+py=/usr/bin/python
+host=https://atvdit.athtem.eei.ericsson.se
+project_rest="$host/api/projects"
+pod_rest="$host/api/pods"
+
+if [ -z "$1" ]; then
+    echo "wrong arguments"
+    exit 1
+fi
+
+os_tenant_name=$1
+filename="$os_tenant_name-openrc.sh"
+
+if [ -f "$filename" ]; then
+    echo "file already exists"
+    exit 1
+fi
+
+project=$(curl --header 'Accept: application/json' --user ${dit_username}:${dit_password} -X GET -ks "$project_rest?q=name=$1")
+os_tenant_id=$($py -c "import json; result=json.loads('$project'); print str(result[0]['id'])")
+os_username=$($py -c "import json; result=json.loads('$project'); print str(result[0]['username'])")
+os_password=$($py -c "import json; result=json.loads('$project'); print str(result[0]['password'])")
+
+pod_id=$($py -c "import json; result=json.loads('$project'); print str(result[0]['pod_id'])")
+os_auth_url=$(curl --header 'Accept: application/json' --user ${dit_username}:${dit_password} -X GET -ks "$pod_rest?q=_id=$pod_id&fields=authUrl" | $py -c $'import sys, json\nresult=json.load(sys.stdin)[0]\nprint str(result["authUrl"])')
+if [[ "$os_auth_url" == *v3 ]]; then
+
+/bin/cat << EOF > "$filename"
+#!/usr/bin/env bash
+
+unset OS_PROJECT_ID
+unset OS_PROJECT_NAME
+unset OS_USER_DOMAIN_NAME
+unset OS_CACERT
+unset OS_REGION_NAME
+unset OS_IDENTITY_API_VERSION
+unset OS_PROJECT_DOMAIN_ID
+unset OS_TENANT_ID
+unset OS_TENANT_NAME
+
+export OS_AUTH_URL=${os_auth_url}
+export OS_PROJECT_NAME="${os_tenant_name}"
+export OS_USERNAME="${os_username}"
+export OS_PASSWORD="${os_password}"
+export OS_IDENTITY_API_VERSION=3
+EOF
+else
+/bin/cat << EOF > "$filename"
+#!/usr/bin/env bash
+
+unset OS_PROJECT_ID
+unset OS_PROJECT_NAME
+unset OS_USER_DOMAIN_NAME
+unset OS_CACERT
+unset OS_REGION_NAME
+unset OS_IDENTITY_API_VERSION
+unset OS_PROJECT_DOMAIN_ID
+unset OS_TENANT_ID
+unset OS_TENANT_NAME
+
+export OS_AUTH_URL=${os_auth_url}
+export OS_TENANT_NAME="${os_tenant_name}"
+export OS_USERNAME="${os_username}"
+export OS_PASSWORD="${os_password}"
+EOF
+fi
+exit 0

@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# Usage: deployment <deployment name>
+#        deployment <deployment name> -u
+#
+
+py=/usr/bin/python
+host=https://atvdit.athtem.eei.ericsson.se
+deployment_rest="$host/api/deployments"
+document_rest="$host/api/documents"
+deployment_name=$1
+
+if [ -z "$1" ]; then
+    echo "wrong arguments"
+    exit 1
+fi
+
+deployment=$(curl -ks "$deployment_rest?q=name=$deployment_name&fields=enm")
+private_key=$(echo $deployment | $py -c $'import sys, json\nresult=json.load(sys.stdin)\nprint str(result[0]["enm"]["private_key"])')
+sed_id=$(echo $deployment | $py -c $'import sys, json\nresult=json.load(sys.stdin)\nprint str(result[0]["enm"]["sed_id"])')
+
+if [ -f "$deployment_name.pem" ]; then
+    rm -f "$deployment_name.pem"
+fi
+echo "$private_key" > "$deployment_name.pem"
+chmod 600 "$deployment_name.pem"
+
+document=$(curl -ks "$document_rest/$sed_id?fields=content/parameters/enm_laf_1_ip_external")
+laf_ip=$($py -c "import json; result=json.loads('$document'); print str(result['content']['parameters']['enm_laf_1_ip_external'])")
+
+if [ "$2" == "-u" ]; then
+    scp -i "$deployment_name.pem" "$deployment_name.pem" cloud-user@$laf_ip:/var/tmp/
+fi
+
+ssh -i "$deployment_name.pem" cloud-user@$laf_ip
+
+exit 0

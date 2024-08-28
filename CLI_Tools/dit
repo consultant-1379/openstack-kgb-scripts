@@ -1,0 +1,36 @@
+#!/bin/bash
+#
+# Usage: dit -d
+#        dit -d <project name>
+#        dit -p
+#        dit -p <deployment name>
+#
+
+py=/usr/bin/python
+host=https://atvdit.athtem.eei.ericsson.se
+
+if [ "$1" == "-d" ]; then
+    rest="$host/api/deployments"
+elif [ "$1" == "-p" ]; then
+    rest="$host/api/projects"
+else
+    echo "wrong argument"
+    exit 1
+fi
+
+rest="$rest?fields=name"
+
+if [ -z "$2" ]; then
+    curl -ks "$rest" | $py -c $'import sys, json\nresults=json.load(sys.stdin)\nfor result in results: print str(result["name"])'
+else
+    if [ "$1" == "-d" ]; then
+        projects_rest="$host/api/projects?q=name=$2"
+        id=$(curl -ks "$projects_rest&fields=_id" | $py -c $'import sys, json\nresult=json.load(sys.stdin)[0]\nprint str(result["_id"])')
+        curl -ks "$rest&q=project_id=$id" | $py -c $'import sys, json\nresult=json.load(sys.stdin)[0]\nprint str(result["name"])'
+    else # "$1" == "-p"
+        deployments_rest="$host/api/deployments?q=name=$2"
+        project_id=$(curl -ks "$deployments_rest&fields=project_id" | $py -c $'import sys, json\nresult=json.load(sys.stdin)[0]\nprint str(result["project_id"])')
+        curl -ks "$rest&q=_id=$project_id" | $py -c $'import sys, json\nresult=json.load(sys.stdin)[0]\nprint str(result["name"])'
+    fi
+fi
+
